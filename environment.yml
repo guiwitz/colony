@@ -1,0 +1,20 @@
+name: colony
+channels:
+  - conda-forge
+dependencies:
+  - scipy
+  - numpy
+  - matplotlib
+  - pandas
+  - scikit-image
+  - jupyter
+  - jupyterlab
+  - jupyter_contrib_nbextensions
+  - ipywidgets
+  - tqdm
+  - pip
+  - voila
+  - nodejs
+  - pip:
+    - pyefd
+    - git+https://github.com/guiwitz/colony.git@master#egg=colony
