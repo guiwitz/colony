@@ -20,6 +20,10 @@ class Folders:
         self.file_list.options = ['..']+self.get_files()
         self.file_list.value = None
         self.file_list.observe(self.move_folders, names='value')
+        
+        self.refresh_button = ipw.Button(description = 'Refresh')
+        self.refresh_button.on_click(self.refresh)
+        
      
     def get_files(self):
         
@@ -29,6 +33,13 @@ class Folders:
         current_folders = sorted(current_folders, key=str.lower)
         
         return current_folders+current_files
+    
+    def refresh(self, b):
+        
+        self.file_list.unobserve(self.move_folders, names='value')
+        self.file_list.options = ['..']+self.get_files()
+        self.file_list.value = None
+        self.file_list.observe(self.move_folders, names='value')
     
     def move_folders(self, change):
         if change['new'] == '..':
