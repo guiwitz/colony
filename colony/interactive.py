@@ -22,13 +22,6 @@ class Gui:
 
         style = {"description_width": "initial"}
 
-        self.folder_field = ipw.Textarea(
-            # description="Folder", value="Enter folder", layout={"width": "700px"}
-            description="Folder",
-            value="Imagefolder",
-            layout={"width": "700px"},
-        )
-
         self.folder_sel = Folders()
         # self.folder_sel._show_dialog()
 
@@ -73,7 +66,7 @@ class Gui:
         self.run_button.description = "Currently analyzing..."
         for file in self.select_file.value:
             contour, peaks, area = co.complete_analysis(
-                self.folder_field.value + "/" + file
+                self.folder_sel.cur_dir.as_posix() + "/" + file
             )
             self.results[file] = {"contour": contour, "peaks": peaks, "area": area}
         self.run_button.description = "Analyze selected jpg"
@@ -89,7 +82,7 @@ class Gui:
                 + str(len(self.select_file.options))
             )
             contour, peaks, area = co.complete_analysis(
-                self.folder_field.value + "/" + file
+                self.folder_sel.cur_dir.as_posix() + "/" + file
             )
             self.results[file] = {"contour": contour, "peaks": peaks, "area": area}
         self.runall_button.description = "Analyze all jpg"
@@ -99,7 +92,7 @@ class Gui:
         with self.out:
             clear_output()
             current_file = self.select_file.value[0]
-            image = skimage.io.imread(self.folder_field.value + "/" + current_file)
+            image = skimage.io.imread(self.folder_sel.cur_dir.as_posix() + "/" + current_file)
 
             fig, ax = plt.subplots(figsize=(10, 10))
             plt.imshow(image, cmap="gray")
@@ -130,9 +123,9 @@ class Gui:
         
     def save_results(self, b):
 
-        if not os.path.isdir(self.folder_field.value + "/Result"):
-            os.makedirs(self.folder_field.value + "/Result")
-        file_to_save = self.folder_field.value + "/Result/results.pkl"
+        if not os.path.isdir(self.folder_sel.cur_dir.as_posix() + "/Result"):
+            os.makedirs(self.folder_sel.cur_dir.as_posix() + "/Result")
+        file_to_save = self.folder_sel.cur_dir.as_posix() + "/Result/results.pkl"
         with open(file_to_save, "wb") as f:
             pickle.dump(self.results, f)
 
@@ -145,11 +138,11 @@ class Gui:
                 }
                 for x in self.results
             ]
-        ).to_csv(self.folder_field.value + "/Result/summary.csv", index=False)
+        ).to_csv(self.folder_sel.cur_dir.as_posix() + "/Result/summary.csv", index=False)
         
     def load_results(self, b):
         
-        file_to_load = self.folder_field.value + "/Result/results.pkl"
+        file_to_load = self.folder_sel.cur_dir.as_posix() + "/Result/results.pkl"
         
         with open(file_to_load, 'rb') as f:
             self.results = pickle.load(f)
