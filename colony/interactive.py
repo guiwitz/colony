@@ -5,7 +5,7 @@ Class implementing a GUI for the analysis of bacterial colonies.
 # License: BSD3
 
 
-import glob, os, pickle
+import glob, os, pickle, re
 import colony.colonies as co
 import ipywidgets as ipw
 import skimage.io
@@ -23,10 +23,10 @@ class Gui:
         style = {"description_width": "initial"}
 
         self.folder_sel = Folders()
-        # self.folder_sel._show_dialog()
 
         self.out = ipw.Output()
-
+        self.out_check = ipw.Output()
+        
         self.files = [
             os.path.split(x)[1] for x in self.folder_sel.cur_dir.glob("*.jpg")
         ] + [os.path.split(x)[1] for x in self.folder_sel.cur_dir.glob("*.JPG")]
@@ -46,9 +46,14 @@ class Gui:
         self.run_button.on_click(self.analyse_single)
 
         self.runall_button = ipw.Button(
-            description="Analyze all jpg", style=style, layout={"width": "250px"}
+            description="Analyze selected folder (single day)", style=style, layout={"width": "250px"}
         )
         self.runall_button.on_click(self.analyse_all)
+        
+        self.runexp_button = ipw.Button(
+            description="Analyze full experiment (multi-folder)", style=style, layout={"width": "250px"}
+        )
+        self.runexp_button.on_click(self.analyse_experiment)
 
         self.plot_button = ipw.Button(description="Plot selected jpg",layout={"width": "250px"})
         self.plot_button.on_click(self.plot_result)
@@ -58,17 +63,27 @@ class Gui:
         
         self.load_button = ipw.Button(description="Load results")
         self.load_button.on_click(self.load_results)
+        
+        self.save_allplots_button = ipw.Button(description="Save all plots")
+        self.save_allplots_button.on_click(self.save_all_plots)
 
         self.folder_sel.file_list.observe(self.on_update_folder, names="value")
+        
+        self.save_plots_check = ipw.Checkbox(description = 'Save plots during analysis', value = True)
 
     def analyse_single(self, b):
 
         self.run_button.description = "Currently analyzing..."
         for file in self.select_file.value:
-            contour, peaks, area = co.complete_analysis(
+            contour, peaks, area, center_mass = co.complete_analysis(
                 self.folder_sel.cur_dir.as_posix() + "/" + file
             )
-            self.results[file] = {"contour": contour, "peaks": peaks, "area": area}
+            self.results[file] = {"contour": contour, "peaks": peaks, "area": area, 'center_mass': center_mass}
+            
+        if self.save_plots_check:
+            self.plot_result()
+            self.fig.savefig(self.folder_sel.cur_dir.as_posix()+'/'+file+'_seg.png')
+            
         self.run_button.description = "Analyze selected jpg"
 
     def analyse_all(self, b):
@@ -81,13 +96,59 @@ class Gui:
                 + "/"
                 + str(len(self.select_file.options))
             )
-            contour, peaks, area = co.complete_analysis(
+            contour, peaks, area, center_mass = co.complete_analysis(
                 self.folder_sel.cur_dir.as_posix() + "/" + file
             )
-            self.results[file] = {"contour": contour, "peaks": peaks, "area": area}
+            self.results[file] = {"contour": contour, "peaks": peaks, "area": area, 'center_mass': center_mass}
+            self.save_results(None)
+                
+            if self.save_plots_check:
+                self.select_file.value = (file,)
+                self.plot_result()
+                self.fig.savefig(self.folder_sel.cur_dir.as_posix()+'/Result/'+file+'_seg.png')
+                
         self.runall_button.description = "Analyze all jpg"
+        
+    def analyse_experiment(self, b):
 
-    def plot_result(self, b):
+        temp_cur_dir = self.folder_sel.cur_dir
+        folder_list = list(self.folder_sel.cur_dir.glob('*'))
+        folder_list = [x for x in folder_list if not re.search('\..*',x.stem)]
+        
+        for indf, f in enumerate(folder_list):
+            self.folder_sel.cur_dir = f
+            
+            self.results = {}
+            current_files = [
+                os.path.split(x)[1] for x in f.glob("*.jpg")
+            ] + [os.path.split(x)[1] for x in f.glob("*.JPG")]
+
+
+            self.runall_button.description = "Currently analyzing..."
+            for ind, file in enumerate(current_files):
+                self.runall_button.description = (
+                    "Currently analyzing folder "
+                    +str(indf)
+                    +' '
+                    + str(ind + 1)
+                    + "/"
+                    + str(len(current_files))
+                )
+                contour, peaks, area, center_mass = co.complete_analysis(
+                    self.folder_sel.cur_dir.as_posix() + '/' + file
+                )
+                self.results[file] = {"contour": contour, "peaks": peaks, "area": area, 'center_mass': center_mass}
+                self.save_results(None)
+                
+                if self.save_plots_check:
+                    self.select_file.value = (file,)
+                    self.plot_result()
+                    self.fig.savefig(self.folder_sel.cur_dir.as_posix()+'/Result/'+file+'_seg.png')
+            
+            self.runall_button.description = "Analyze all jpg"
+            self.folder_sel.cur_dir = temp_cur_dir
+
+    def plot_result(self, b = None):
 
         with self.out:
             clear_output()
@@ -95,7 +156,7 @@ class Gui:
             image = skimage.io.imread(self.folder_sel.cur_dir.as_posix() + "/" + current_file)
 
             fig, ax = plt.subplots(figsize=(10, 10))
-            plt.imshow(image, cmap="gray")
+            plt.imshow(image[:,:,1], cmap="gray")
             plt.plot(
                 self.results[current_file]["contour"][:, 1],
                 self.results[current_file]["contour"][:, 0],
@@ -110,9 +171,11 @@ class Gui:
                 ],
                 "bo",
             )
-
+            ax.set_xticks([])
+            ax.set_yticks([])
             fig.tight_layout()
             plt.show()
+            self.fig = fig
 
     def on_update_folder(self, change):
 
@@ -121,7 +184,10 @@ class Gui:
         ] + [os.path.split(x)[1] for x in self.folder_sel.cur_dir.glob("*.JPG")]
         self.select_file.options = tuple(self.files)
         
-    def save_results(self, b):
+        #clear results
+        self.results = {}
+        
+    def save_results(self, b=None):
 
         if not os.path.isdir(self.folder_sel.cur_dir.as_posix() + "/Result"):
             os.makedirs(self.folder_sel.cur_dir.as_posix() + "/Result")
@@ -135,10 +201,21 @@ class Gui:
                     "filename": x,
                     "num_peaks": len(self.results[x]["peaks"]),
                     "area": self.results[x]["area"],
+                    "center_mass": self.results[x]["center_mass"]
                 }
                 for x in self.results
             ]
         ).to_csv(self.folder_sel.cur_dir.as_posix() + "/Result/summary.csv", index=False)
+        
+    def save_all_plots(self, b):
+        
+        #with self.out_check:
+        for f in self.select_file.options:
+            self.select_file.value = (f,)
+            self.plot_result()
+            self.fig.savefig(self.folder_sel.cur_dir.as_posix()+'/Result/'+f+'_seg.png')
+            
+        
         
     def load_results(self, b):
         

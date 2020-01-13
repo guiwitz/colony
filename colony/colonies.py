@@ -17,6 +17,7 @@ from skimage.transform import hough_line, hough_line_peaks
 
 import scipy
 from scipy.ndimage import uniform_filter
+import scipy.ndimage as ndi
 
 from pyefd import (
     elliptic_fourier_descriptors,
@@ -434,4 +435,7 @@ def complete_analysis(file):
     #normalize area by dish area
     area = area / np.sum(mask_scaled_crop)
     
-    return contour_upscaled, peak, area
+    #find center of mass of plate
+    center_mass = 2*(np.array(ndi.measurements.center_of_mass(mask_scaled_crop))+ np.array([bbox[0],bbox[1]]))
+    
+    return contour_upscaled, peak, area, center_mass
