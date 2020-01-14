@@ -5,7 +5,7 @@ Class implementing a GUI for the analysis of bacterial colonies.
 # License: BSD3
 
 
-import glob, os, pickle, re
+import glob, os, pickle, re, subprocess
 import colony.colonies as co
 import ipywidgets as ipw
 import skimage.io
@@ -21,6 +21,7 @@ class Gui:
     def __init__(self):
 
         style = {"description_width": "initial"}
+        layout= {"width": "250px"}
 
         self.folder_sel = Folders()
 
@@ -41,21 +42,21 @@ class Gui:
         self.results = {}
 
         self.run_button = ipw.Button(
-            description="Analyze selected jpg", style=style, layout={"width": "250px"}
+            description="Analyze selected jpg", style=style, layout=layout
         )
         self.run_button.on_click(self.analyse_single)
 
         self.runall_button = ipw.Button(
-            description="Analyze selected folder (single day)", style=style, layout={"width": "250px"}
+            description="Analyze selected folder (single day)", style=style, layout=layout
         )
         self.runall_button.on_click(self.analyse_all)
         
         self.runexp_button = ipw.Button(
-            description="Analyze full experiment (multi-folder)", style=style, layout={"width": "250px"}
+            description="Analyze full experiment (multi-folder)", style=style, layout=layout
         )
         self.runexp_button.on_click(self.analyse_experiment)
 
-        self.plot_button = ipw.Button(description="Plot selected jpg",layout={"width": "250px"})
+        self.plot_button = ipw.Button(description="Plot selected jpg",layout=layout)
         self.plot_button.on_click(self.plot_result)
 
         self.save_button = ipw.Button(description="Save results")
@@ -70,6 +71,9 @@ class Gui:
         self.folder_sel.file_list.observe(self.on_update_folder, names="value")
         
         self.save_plots_check = ipw.Checkbox(description = 'Save plots during analysis', value = True)
+        
+        self.zip_button = ipw.Button(description = 'Zip results', style = style, layout = layout)
+        self.zip_button.on_click(self.do_zipping)
 
     def analyse_single(self, b):
 
@@ -116,12 +120,14 @@ class Gui:
         folder_list = [x for x in folder_list if not re.search('\..*',x.stem)]
         
         for indf, f in enumerate(folder_list):
+            
             self.folder_sel.cur_dir = f
             
             self.results = {}
             current_files = [
                 os.path.split(x)[1] for x in f.glob("*.jpg")
             ] + [os.path.split(x)[1] for x in f.glob("*.JPG")]
+            self.select_file.options = current_files
 
 
             self.runall_button.description = "Currently analyzing..."
@@ -134,17 +140,19 @@ class Gui:
                     + "/"
                     + str(len(current_files))
                 )
+                
                 contour, peaks, area, center_mass = co.complete_analysis(
                     self.folder_sel.cur_dir.as_posix() + '/' + file
                 )
                 self.results[file] = {"contour": contour, "peaks": peaks, "area": area, 'center_mass': center_mass}
                 self.save_results(None)
-                
-                if self.save_plots_check:
-                    self.select_file.value = (file,)
-                    self.plot_result()
-                    self.fig.savefig(self.folder_sel.cur_dir.as_posix()+'/Result/'+file+'_seg.png')
-            
+                with self.out:
+                    
+                    if self.save_plots_check:
+                        self.select_file.value = (file,)
+                        self.plot_result()
+                        self.fig.savefig(self.folder_sel.cur_dir.as_posix()+'/Result/'+file+'_seg.png')
+
             self.runall_button.description = "Analyze all jpg"
             self.folder_sel.cur_dir = temp_cur_dir
 
@@ -223,3 +231,15 @@ class Gui:
         
         with open(file_to_load, 'rb') as f:
             self.results = pickle.load(f)
+            
+            
+    def do_zipping(self, b):
+        """zip the output"""
+        
+        self.zip_button.description = 'Currently zipping...'
+        #save the summary file
+        
+        with self.out:
+            #subprocess.call(['tar', '-czf', 'to_download.tar.gz','-C', self.folders.cur_dir.as_posix(),'.'])
+            subprocess.call(['tar', '-czf', self.folder_sel.cur_dir.parent.as_posix()+'/to_download.tar.gz','-C', self.folder_sel.cur_dir.parent.as_posix(), self.folder_sel.cur_dir.name])
+        self.zip_button.description = 'Finished zipping!'
