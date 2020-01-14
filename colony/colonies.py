@@ -388,54 +388,58 @@ def find_branches(contour, prominence = 20, max_peak_width = 100):
 
 
 def complete_analysis(file):
-    image = skimage.io.imread(file)[:, :, 1]
-    image_scaled = image[::2, ::2]
-    image_scaled_crop, mask_scaled_crop, bbox = find_dish(image_scaled)
-    image_crop = image[2 * bbox[0] : 2 * bbox[2], 2 * bbox[1] : 2 * bbox[3]]
+    try:
+        image = skimage.io.imread(file)[:, :, 1]
+        image_scaled = image[::2, ::2]
+        image_scaled_crop, mask_scaled_crop, bbox = find_dish(image_scaled)
+        image_crop = image[2 * bbox[0] : 2 * bbox[2], 2 * bbox[1] : 2 * bbox[3]]
 
-    # remove spots
-    image_scaled_clean = remove_spots(image_scaled_crop)
+        # remove spots
+        image_scaled_clean = remove_spots(image_scaled_crop)
 
-    # find rough contour of colony
-    rough_colony = rough_colony_farid(image_scaled_clean)
-    rough_colony_large = skimage.morphology.binary_dilation(
-        rough_colony, skimage.morphology.disk(20)
-    )
+        # find rough contour of colony
+        rough_colony = rough_colony_farid(image_scaled_clean)
+        rough_colony_large = skimage.morphology.binary_dilation(
+            rough_colony, skimage.morphology.disk(20)
+        )
 
-    # calculate backgorund by interpolating the colony area
-    back = calculate_background(image_scaled_clean, rough_colony)
-    back[np.isnan(back)] = 0
+        # calculate backgorund by interpolating the colony area
+        back = calculate_background(image_scaled_clean, rough_colony)
+        back[np.isnan(back)] = 0
 
-    # correct background of image and enhance contrast
-    im_enhanced = correct_background(image_scaled_clean, back)
+        # correct background of image and enhance contrast
+        im_enhanced = correct_background(image_scaled_clean, back)
 
-    # find an Otsu threshold by observing a band around the rough colony
-    threshold = skimage.filters.threshold_otsu(
-        im_enhanced[
-            rough_colony_large
-            ^ skimage.morphology.binary_erosion(
-                rough_colony, skimage.morphology.disk(10)
-            )
-        ]
-    )
+        # find an Otsu threshold by observing a band around the rough colony
+        threshold = skimage.filters.threshold_otsu(
+            im_enhanced[
+                rough_colony_large
+                ^ skimage.morphology.binary_erosion(
+                    rough_colony, skimage.morphology.disk(10)
+                )
+            ]
+        )
 
-    # final clean-up
-    final_colony = skimage.morphology.binary_closing(
-        (rough_colony_large * im_enhanced) > threshold, skimage.morphology.disk(1)
-    )  # *plate_scaled_mask
+        # final clean-up
+        final_colony = skimage.morphology.binary_closing(
+            (rough_colony_large * im_enhanced) > threshold, skimage.morphology.disk(1)
+        )  # *plate_scaled_mask
 
-    # create contour
-    contour, area = create_contour(final_colony)
+        # create contour
+        contour, area = create_contour(final_colony)
 
-    # find peaks
-    peak = find_branches(contour)
+        # find peaks
+        peak = find_branches(contour)
+
+        contour_upscaled = 2*(contour + np.array([bbox[0],bbox[1]]))
+
+        #normalize area by dish area
+        area = area / np.sum(mask_scaled_crop)
+
+        #find center of mass of plate
+        center_mass = 2*(np.array(ndi.measurements.center_of_mass(mask_scaled_crop))+ np.array([bbox[0],bbox[1]]))        
+
+        return contour_upscaled, peak, area, center_mass
     
-    contour_upscaled = 2*(contour + np.array([bbox[0],bbox[1]]))
-    
-    #normalize area by dish area
-    area = area / np.sum(mask_scaled_crop)
-    
-    #find center of mass of plate
-    center_mass = 2*(np.array(ndi.measurements.center_of_mass(mask_scaled_crop))+ np.array([bbox[0],bbox[1]]))
-    
-    return contour_upscaled, peak, area, center_mass
+    except:
+        return None, None, None, None

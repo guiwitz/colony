@@ -86,7 +86,7 @@ class Gui:
             
         if self.save_plots_check:
             self.plot_result()
-            self.fig.savefig(self.folder_sel.cur_dir.as_posix()+'/'+file+'_seg.png')
+            self.fig.savefig(self.folder_sel.cur_dir.as_posix()+'/Result/'+file+'_seg.png')
             
         self.run_button.description = "Analyze selected jpg"
 
@@ -161,24 +161,26 @@ class Gui:
         with self.out:
             clear_output()
             current_file = self.select_file.value[0]
-            image = skimage.io.imread(self.folder_sel.cur_dir.as_posix() + "/" + current_file)
-
             fig, ax = plt.subplots(figsize=(10, 10))
-            plt.imshow(image[:,:,1], cmap="gray")
-            plt.plot(
-                self.results[current_file]["contour"][:, 1],
-                self.results[current_file]["contour"][:, 0],
-                "r-",
-            )
-            plt.plot(
-                self.results[current_file]["contour"][
-                    self.results[current_file]["peaks"], 1
-                ],
-                self.results[current_file]["contour"][
-                    self.results[current_file]["peaks"], 0
-                ],
-                "bo",
-            )
+            if self.results[current_file]["contour"] is not None:
+                image = skimage.io.imread(self.folder_sel.cur_dir.as_posix() + "/" + current_file)
+
+                
+                plt.imshow(image[:,:,1], cmap="gray")
+                plt.plot(
+                    self.results[current_file]["contour"][:, 1],
+                    self.results[current_file]["contour"][:, 0],
+                    "r-",
+                )
+                plt.plot(
+                    self.results[current_file]["contour"][
+                        self.results[current_file]["peaks"], 1
+                    ],
+                    self.results[current_file]["contour"][
+                        self.results[current_file]["peaks"], 0
+                    ],
+                    "bo",
+                )
             ax.set_xticks([])
             ax.set_yticks([])
             fig.tight_layout()
@@ -207,7 +209,7 @@ class Gui:
             [
                 {
                     "filename": x,
-                    "num_peaks": len(self.results[x]["peaks"]),
+                    "num_peaks": len(self.results[x]["peaks"]) if self.results[x]["peaks"] is not None else None,
                     "area": self.results[x]["area"],
                     "center_mass": self.results[x]["center_mass"]
                 }
