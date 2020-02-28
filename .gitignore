@@ -1,1 +1,5 @@
 /colony.egg-info/
+/colony/__pycache__/
+/.vscode/
+/.ipynb_checkpoints/
+test_colony.ipynb

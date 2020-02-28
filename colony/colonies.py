@@ -361,7 +361,7 @@ def correct_background(image, background):
     return im_enhanced
 
 
-def find_branches(contour, prominence = 20, max_peak_width = 100):
+def find_branches(contour, prominence=20, max_peak_width=100):
     """Find branches in the colony by detecting peaks in the contour 
     distance from the center of mass of the colony
     
@@ -380,8 +380,12 @@ def find_branches(contour, prominence = 20, max_peak_width = 100):
     cm = np.mean(contour, axis=0)
     center_dist = ((contour[:, 0] - cm[0]) ** 2 + (contour[:, 1] - cm[1]) ** 2) ** 0.5
     center_dist = np.concatenate((center_dist, center_dist[1:200]))
-    peak, peak_info = scipy.signal.find_peaks(center_dist, distance=10, width=7,prominence=prominence)
-    peak[(peak_info["prominences"] > prominence) & (peak_info["widths"] < max_peak_width)]
+    peak, peak_info = scipy.signal.find_peaks(
+        center_dist, distance=10, width=7, prominence=prominence
+    )
+    peak[
+        (peak_info["prominences"] > prominence) & (peak_info["widths"] < max_peak_width)
+    ]
     peak = peak[peak < len(contour) + 1] % len(contour)
 
     return peak
@@ -431,15 +435,18 @@ def complete_analysis(file):
         # find peaks
         peak = find_branches(contour)
 
-        contour_upscaled = 2*(contour + np.array([bbox[0],bbox[1]]))
+        contour_upscaled = 2 * (contour + np.array([bbox[0], bbox[1]]))
 
-        #normalize area by dish area
+        # normalize area by dish area
         area = area / np.sum(mask_scaled_crop)
 
-        #find center of mass of plate
-        center_mass = 2*(np.array(ndi.measurements.center_of_mass(mask_scaled_crop))+ np.array([bbox[0],bbox[1]]))        
+        # find center of mass of plate
+        center_mass = 2 * (
+            np.array(ndi.measurements.center_of_mass(mask_scaled_crop))
+            + np.array([bbox[0], bbox[1]])
+        )
 
         return contour_upscaled, peak, area, center_mass
-    
+
     except:
         return None, None, None, None
